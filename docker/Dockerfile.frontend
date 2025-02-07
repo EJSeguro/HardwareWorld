@@ -1,0 +1,25 @@
+FROM node:latest AS build-stage
+
+WORKDIR /app
+
+COPY ./frontend/package.json ./frontend/package-lock.json ./
+
+COPY ./frontend /app
+
+RUN npm install
+
+RUN npm install -D @vitejs/plugin-vue
+
+RUN npm install --legacy-peer-deps
+
+RUN npm run build
+
+EXPOSE 8080
+
+FROM nginx:alpine AS production-stage
+
+COPY --from=build-stage /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
