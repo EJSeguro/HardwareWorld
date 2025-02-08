@@ -1,51 +1,80 @@
-services:
-  frontend:
-    build:
-      context: .
-      dockerfile: ./docker/Dockerfile.frontend
-    volumes:
-      - ./frontend:/app
-    ports:
-      - "8080:8080"
-    networks:
-      - app-network
 
-  backend:
+services:
+  app:
     build:
-      context: .
-      dockerfile: ./docker/Dockerfile.backend
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: laravel_app
+    restart: unless-stopped
+    working_dir: /var/www
     volumes:
-      - ./backend:/api
-    ports:
-      - "8000:8000"
-    networks:
-      - app-network
+      - ./backend:/var/www
     depends_on:
       - db
+    networks:
+      - app_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vue_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173" 
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - app_network
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./backend:/var/www
+    depends_on:
+      - app
+    networks:
+      - app_network
 
   db:
     image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: laravel_db
-      MYSQL_USER: laravel_user
-      MYSQL_PASSWORD: laravel_password
-    networks:
-      - app-network
-
-  nginx:
-    image: nginx:alpine
-    volumes:
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf   # Mapeando o nginx.conf da pasta docker
-      - ./frontend/dist:/app/dist
+    container_name: mysql_db
+    restart: unless-stopped
     ports:
-      - "80:80"
-    depends_on:
-      - frontend
-      - backend
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: hardwareworld
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - db_data:/var/lib/mysql
     networks:
-      - app-network
+      - app_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: always
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: password
+    depends_on:
+      - db
+    ports:
+      - "8075:80"
+    networks:
+      - app_network
+
+volumes:
+  db_data:
 
 networks:
-  app-network:
+  app_network:
     driver: bridge
